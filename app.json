@@ -37,6 +37,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://casualplayhub.com"
+      },
+      "eas": {
+        "projectId": "68b5b0a6-a450-420b-97e6-a7ba24c97eaf"
+      }
     }
   }
 }
