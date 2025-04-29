@@ -7,6 +7,7 @@ export const theme = {
     primaryLight: '#E5F1FF',
     card: '#F5F5F5',
     border: '#E5E5E5',
+    gold: '#FFD700',
   },
   dark: {
     background: '#000000',
@@ -16,5 +17,6 @@ export const theme = {
     primaryLight: '#1C1C1E',
     card: '#1C1C1E',
     border: '#333333',
+    gold: '#FFD700',
   },
 };

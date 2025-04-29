@@ -19,6 +19,11 @@ import { useCoinsStore } from "@/store/coins-store";
 import TicTacToe from "@/components/games/TicTacToe";
 import Sudoku from "@/components/games/Sudoku";
 import BlockPuzzle from "@/components/games/BlockPuzzle";
+import MathCalc from "@/components/games/MathCalc";
+import Game2048 from "@/components/games/Game2048";
+import MemoryTrainer from "@/components/games/MemoryTrainer";
+import Concentration from "@/components/games/Concentration";
+import Checkers from "@/components/games/Checkers";
 
 export default function GameScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,6 +78,16 @@ export default function GameScreen() {
         return <Sudoku onScoreChange={handleScoreChange} />;
       case "blockpuzzle":
         return <BlockPuzzle onScoreChange={handleScoreChange} />;
+      case "mathcalc":
+        return <MathCalc onScoreChange={handleScoreChange} />;
+      case "game2048":
+        return <Game2048 onScoreChange={handleScoreChange} />;
+      case "memorytrainer":
+        return <MemoryTrainer onScoreChange={handleScoreChange} />;
+      case "concentration":
+        return <Concentration onScoreChange={handleScoreChange} />;
+      case "checkers":
+        return <Checkers onScoreChange={handleScoreChange} />;
       default:
         return (
           <View style={styles.placeholderContainer}>
@@ -160,6 +175,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
+    marginBottom: 8,
   },
   backButton: {
     width: 40,
@@ -179,7 +195,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   scoreItem: {
     flexDirection: "row",
@@ -195,7 +211,7 @@ const styles = StyleSheet.create({
   },
   gameContainer: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingBottom: 16,
   },
   placeholderContainer: {
@@ -206,5 +222,6 @@ const styles = StyleSheet.create({
   placeholderText: {
     fontFamily: "Poppins-Medium",
     fontSize: 18,
+    textAlign: "center",
   },
 });

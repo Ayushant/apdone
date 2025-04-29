@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -18,11 +18,17 @@ interface BlockPuzzleProps {
   onScoreChange: (score: number) => void;
 }
 
-const GRID_SIZE = 12; // Increased height for falling blocks
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const GRID_SIZE = 10; // Reduced from 12 to make game area smaller
 const GRID_WIDTH = 8;
-const { width } = Dimensions.get("window");
-const CELL_SIZE = Math.min(width - 32, 360) / GRID_WIDTH;
-const FALL_SPEED = 1000; // 1 second per block fall
+const CELL_SIZE = Math.min(
+  (SCREEN_WIDTH - 48) / GRID_WIDTH,
+  (SCREEN_HEIGHT - 350) / GRID_SIZE  // Increased space reservation for controls
+);
+const FALL_SPEED = 800; // Reduced from 1000 to make game smoother
+const DRAG_THRESHOLD = 5; // Small threshold for more precise dragging
+const SNAP_ANIMATION_DURATION = 150;
+const CONTROL_BUTTON_SIZE = Math.min(64, SCREEN_WIDTH * 0.16); // Increased button size
 
 // Tetris-like block shapes
 const BLOCKS = [
@@ -69,6 +75,24 @@ export default function BlockPuzzle({ onScoreChange }: BlockPuzzleProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition] = useState(new Animated.ValueXY());
   const [lastValidPosition, setLastValidPosition] = useState<{ row: number, col: number } | null>(null);
+  const [validPosition, setValidPosition] = useState(false);
+  const snapAnimation = useRef(new Animated.Value(0)).current;
+
+  // Add animation styles for valid position feedback
+  const blockAnimatedStyle = {
+    transform: [
+      {
+        scale: snapAnimation.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.05]
+        })
+      }
+    ],
+    opacity: snapAnimation.interpolate({
+      inputRange: [0, 1],
+      outputRange: [1, 0.8]
+    })
+  };
 
   // Pan Responder setup for drag gestures
   const panResponder = React.useRef(
@@ -79,27 +103,66 @@ export default function BlockPuzzle({ onScoreChange }: BlockPuzzleProps) {
         if (currentPosition) {
           setLastValidPosition(currentPosition);
         }
+        // Start gentle pulse animation
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(snapAnimation, {
+              toValue: 1,
+              duration: 600,
+              useNativeDriver: true
+            }),
+            Animated.timing(snapAnimation, {
+              toValue: 0,
+              duration: 600,
+              useNativeDriver: true
+            })
+          ])
+        ).start();
       },
       onPanResponderMove: (_, gesture) => {
-        if (!currentBlock || !currentPosition) return;
+        if (!currentBlock || !lastValidPosition) return;
 
-        const newCol = Math.round(gesture.dx / CELL_SIZE) + lastValidPosition!.col;
-        const newRow = Math.round(gesture.dy / CELL_SIZE) + lastValidPosition!.row;
+        // Calculate grid position with improved precision
+        const newCol = Math.round((gesture.dx + DRAG_THRESHOLD) / CELL_SIZE) + lastValidPosition.col;
+        const newRow = Math.round((gesture.dy + DRAG_THRESHOLD) / CELL_SIZE) + lastValidPosition.row;
 
-        // Check if new position is valid
-        if (canPlaceBlock(newRow, newCol, currentBlock)) {
+        // Check if position is valid and update visual feedback
+        const isValid = canPlaceBlock(newRow, newCol, currentBlock);
+        setValidPosition(isValid);
+
+        if (isValid) {
+          if (Platform.OS !== "web") {
+            Haptics.selectionAsync();
+          }
           setCurrentPosition({ row: newRow, col: newCol });
-          dragPosition.setValue({ x: gesture.dx, y: gesture.dy });
         }
       },
       onPanResponderRelease: () => {
         setIsDragging(false);
-        dragPosition.setValue({ x: 0, y: 0 });
-        // Check if we need to lock the block
-        if (currentPosition && !canPlaceBlock(currentPosition.row + 1, currentPosition.col, currentBlock)) {
-          lockBlock();
+        snapAnimation.stopAnimation();
+        snapAnimation.setValue(0);
+
+        if (!currentBlock || !currentPosition) return;
+
+        // Snap animation for block placement
+        if (validPosition) {
+          if (Platform.OS !== "web") {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+          Animated.timing(snapAnimation, {
+            toValue: 0,
+            duration: SNAP_ANIMATION_DURATION,
+            useNativeDriver: true
+          }).start(() => {
+            lockBlock();
+          });
+        } else {
+          // Return to last valid position
+          if (lastValidPosition) {
+            setCurrentPosition(lastValidPosition);
+          }
         }
-      },
+      }
     })
   ).current;
 
@@ -320,13 +383,19 @@ export default function BlockPuzzle({ onScoreChange }: BlockPuzzleProps) {
             Next Block:
           </Text>
         )}
-        <View style={[
-          styles.block,
-          { 
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-          }
-        ]}>
+        <Animated.View
+          style={[
+            styles.block,
+            { 
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+            },
+            !preview && validPosition && {
+              backgroundColor: colors.primaryLight,
+            },
+            !preview && blockAnimatedStyle
+          ]}
+        >
           {block.map((row, rowIndex) => (
             <View key={`block-row-${rowIndex}`} style={styles.blockRow}>
               {row.map((cell, colIndex) => (
@@ -337,15 +406,23 @@ export default function BlockPuzzle({ onScoreChange }: BlockPuzzleProps) {
                     {
                       width: CELL_SIZE * 0.6,
                       height: CELL_SIZE * 0.6,
-                      backgroundColor: cell === 1 ? colors.primary : "transparent",
-                      borderColor: cell === 1 ? colors.primary : "transparent",
+                      backgroundColor: cell === 1 
+                        ? validPosition && !preview
+                          ? colors.primary + "CC"
+                          : colors.primary
+                        : "transparent",
+                      borderColor: cell === 1 
+                        ? validPosition && !preview
+                          ? colors.primary + "CC"
+                          : colors.primary
+                        : "transparent",
                     },
                   ]}
                 />
               ))}
             </View>
           ))}
-        </View>
+        </Animated.View>
       </View>
     );
   };
@@ -401,6 +478,12 @@ export default function BlockPuzzle({ onScoreChange }: BlockPuzzleProps) {
         <View style={styles.gameOverContainer}>
           <Text style={[styles.gameOverText, { color: colors.text }]}>Game Over!</Text>
           <Text style={[styles.scoreText, { color: colors.text }]}>Final Score: {score}</Text>
+          <TouchableOpacity
+            style={[styles.resetButton, { backgroundColor: colors.primary }]}
+            onPress={resetGame}
+          >
+            <Text style={[styles.resetButtonText, { color: "white" }]}>Play Again</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>
@@ -423,16 +506,18 @@ export default function BlockPuzzle({ onScoreChange }: BlockPuzzleProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
+    paddingHorizontal: 8,
   },
   title: {
-    fontSize: 24,
+    fontSize: Math.min(24, SCREEN_WIDTH * 0.06),
     fontFamily: 'Poppins-Bold',
   },
   resetButton: {
@@ -443,21 +528,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'flex-start',
-    marginBottom: 24,
+    marginBottom: 16,
+    flexWrap: 'wrap',
   },
   nextBlockContainer: {
     marginRight: 16,
+    marginBottom: 16,
   },
   blockContainer: {
     alignItems: 'center',
   },
   blockTitle: {
     fontFamily: 'Poppins-Medium',
-    fontSize: 14,
+    fontSize: Math.min(14, SCREEN_WIDTH * 0.035),
     marginBottom: 8,
   },
   block: {
-    padding: 8,
+    padding: 6,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -471,7 +558,8 @@ const styles = StyleSheet.create({
   grid: {
     borderWidth: 2,
     borderRadius: 12,
-    padding: 8,
+    padding: 6,
+    alignSelf: 'center',
   },
   row: {
     flexDirection: 'row',
@@ -484,38 +572,58 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 24,
+    flexWrap: 'wrap',
+    marginTop: 8,
+    marginBottom: 16,
+    gap: 12,
   },
   controlButton: {
-    width: 50,
-    height: 50,
+    width: CONTROL_BUTTON_SIZE,
+    height: CONTROL_BUTTON_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 25,
-    marginHorizontal: 8,
+    borderRadius: CONTROL_BUTTON_SIZE / 2,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   controlText: {
-    fontSize: 24,
+    fontSize: Math.min(28, SCREEN_WIDTH * 0.07),
     fontFamily: 'Poppins-Bold',
   },
   gameOverContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
   gameOverText: {
-    fontSize: 32,
+    fontSize: Math.min(32, SCREEN_WIDTH * 0.08),
     fontFamily: 'Poppins-Bold',
     marginBottom: 16,
+    textAlign: 'center',
   },
   scoreText: {
-    fontSize: 24,
+    fontSize: Math.min(24, SCREEN_WIDTH * 0.06),
     fontFamily: 'Poppins-Medium',
+    textAlign: 'center',
+  },
+  resetButtonText: {
+    fontSize: Math.min(16, SCREEN_WIDTH * 0.04),
+    fontFamily: 'Poppins-Bold',
   },
   instructions: {
     fontFamily: 'Poppins-Regular',
-    fontSize: 14,
+    fontSize: Math.min(14, SCREEN_WIDTH * 0.035),
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 8,
+    paddingHorizontal: 16,
   },
 });

@@ -3,22 +3,23 @@ export const gameCategories = [
   { id: 'puzzle', name: 'Puzzle' },
   { id: 'strategy', name: 'Strategy' },
   { id: 'casual', name: 'Casual' },
+  { id: 'educational', name: 'Educational' },
 ];
 
 export const allGames = [
   {
     id: 'tictactoe',
     name: 'Tic Tac Toe',
-    description: 'Classic game of X\'s and O\'s',
-    category: 'casual',
-    image: 'https://images.unsplash.com/photo-1611996575749-79a3a250f948?q=80&w=500',
+    description: 'Classic X and O game',
+    category: 'strategy',
+    image: 'https://images.unsplash.com/photo-1612404730960-5c71577fca11?q=80&w=500',
     rating: 4.5,
-    players: '2 Players',
+    players: '1 Player',
   },
   {
     id: 'sudoku',
     name: 'Sudoku',
-    description: 'Classic number puzzle game',
+    description: 'Fill in the numbers puzzle',
     category: 'puzzle',
     image: 'https://images.unsplash.com/photo-1580541832626-2a7131ee809f?q=80&w=500',
     rating: 4.8,
@@ -33,4 +34,52 @@ export const allGames = [
     rating: 4.6,
     players: '1 Player',
   },
+  {
+    id: 'mathcalc',
+    name: 'Math Challenge',
+    description: 'Test your math skills against the clock!',
+    category: 'educational',
+    image: 'https://images.unsplash.com/photo-1596495577886-d920f1fb7238?q=80&w=500',
+    rating: 4.7,
+    players: '1 Player',
+  },
+  {
+    id: 'game2048',
+    name: '2048',
+    description: 'Merge tiles to reach 2048',
+    category: 'puzzle',
+    image: 'https://images.unsplash.com/photo-1581798459219-318e76aecc7b?q=80&w=500',
+    rating: 4.9,
+    players: '1 Player',
+  },
+  {
+    id: 'memorytrainer',
+    name: 'Memory Trainer',
+    description: 'Train your eidetic memory skills',
+    category: 'puzzle',
+    image: 'https://images.unsplash.com/photo-1501139083538-0139583c060f?q=80&w=500',
+    rating: 4.7,
+    players: '1 Player',
+  },
+  {
+    id: 'concentration',
+    name: 'Concentration',
+    description: 'Test your memory with card matching',
+    category: 'puzzle',
+    image: 'https://images.unsplash.com/photo-1632507127789-ff3d56cb7fb1?q=80&w=500',
+    rating: 4.6,
+    players: '1 Player',
+  },
+  {
+    id: 'checkers',
+    name: 'Checkers',
+    description: 'Classic board game of strategy',
+    category: 'strategy',
+    image: 'https://images.unsplash.com/photo-1611195974226-a6a9be9dd763?q=80&w=500',
+    rating: 4.7,
+    players: '1 Player',
+  },
 ];
+
+// Featured games for the home screen
+export const featuredGames = [allGames[0], allGames[1], allGames[4]];
