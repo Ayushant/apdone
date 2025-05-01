@@ -24,6 +24,7 @@ import Game2048 from "@/components/games/Game2048";
 import MemoryTrainer from "@/components/games/MemoryTrainer";
 import Concentration from "@/components/games/Concentration";
 import Checkers from "@/components/games/Checkers";
+import FlappyBird from "@/components/games/FlappyBird";
 
 export default function GameScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -88,6 +89,8 @@ export default function GameScreen() {
         return <Concentration onScoreChange={handleScoreChange} />;
       case "checkers":
         return <Checkers onScoreChange={handleScoreChange} />;
+      case "flappybird":
+        return <FlappyBird onScoreChange={handleScoreChange} />;
       default:
         return (
           <View style={styles.placeholderContainer}>

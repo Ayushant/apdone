@@ -188,15 +188,24 @@ export default function Game2048({ onScoreChange }: Game2048Props) {
 
   const moveLeft = () => {
     const newGrid = grid.map(row => {
+      // First filter out zeros and create a new array
       const merged = row.filter(cell => cell !== 0);
-      for (let i = 0; i < merged.length - 1; i++) {
-        if (merged[i] === merged[i + 1]) {
-          merged[i] *= 2;
-          setScore(prev => prev + merged[i]);
-          merged.splice(i + 1, 1);
+      const result = [];
+      
+      // Iterate through the filtered array to merge pairs
+      for (let i = 0; i < merged.length; i++) {
+        if (i < merged.length - 1 && merged[i] === merged[i + 1]) {
+          // Merge equal adjacent numbers
+          result.push(merged[i] * 2);
+          setScore(prev => prev + merged[i] * 2);
+          i++; // Skip next number since we merged it
+        } else {
+          result.push(merged[i]);
         }
       }
-      return [...merged, ...Array(GRID_SIZE - merged.length).fill(0)];
+      
+      // Fill the remaining space with zeros
+      return [...result, ...Array(GRID_SIZE - result.length).fill(0)];
     });
     
     if (JSON.stringify(newGrid) !== JSON.stringify(grid)) {
@@ -207,15 +216,24 @@ export default function Game2048({ onScoreChange }: Game2048Props) {
 
   const moveRight = () => {
     const newGrid = grid.map(row => {
+      // First filter out zeros and create a new array
       const merged = row.filter(cell => cell !== 0);
-      for (let i = merged.length - 1; i > 0; i--) {
-        if (merged[i] === merged[i - 1]) {
-          merged[i] *= 2;
-          setScore(prev => prev + merged[i]);
-          merged.splice(i - 1, 1);
+      const result = [];
+      
+      // Iterate through the filtered array to merge pairs (from right to left)
+      for (let i = merged.length - 1; i >= 0; i--) {
+        if (i > 0 && merged[i] === merged[i - 1]) {
+          // Merge equal adjacent numbers
+          result.unshift(merged[i] * 2);
+          setScore(prev => prev + merged[i] * 2);
+          i--; // Skip next number since we merged it
+        } else {
+          result.unshift(merged[i]);
         }
       }
-      return [...Array(GRID_SIZE - merged.length).fill(0), ...merged];
+      
+      // Fill the remaining space with zeros
+      return [...Array(GRID_SIZE - result.length).fill(0), ...result];
     });
     
     if (JSON.stringify(newGrid) !== JSON.stringify(grid)) {
@@ -227,15 +245,24 @@ export default function Game2048({ onScoreChange }: Game2048Props) {
   const moveUp = () => {
     const rotated = rotateGrid(grid);
     const moved = rotated.map(row => {
+      // First filter out zeros and create a new array
       const merged = row.filter(cell => cell !== 0);
-      for (let i = 0; i < merged.length - 1; i++) {
-        if (merged[i] === merged[i + 1]) {
-          merged[i] *= 2;
-          setScore(prev => prev + merged[i]);
-          merged.splice(i + 1, 1);
+      const result = [];
+      
+      // Iterate through the filtered array to merge pairs
+      for (let i = 0; i < merged.length; i++) {
+        if (i < merged.length - 1 && merged[i] === merged[i + 1]) {
+          // Merge equal adjacent numbers
+          result.push(merged[i] * 2);
+          setScore(prev => prev + merged[i] * 2);
+          i++; // Skip next number since we merged it
+        } else {
+          result.push(merged[i]);
         }
       }
-      return [...merged, ...Array(GRID_SIZE - merged.length).fill(0)];
+      
+      // Fill the remaining space with zeros
+      return [...result, ...Array(GRID_SIZE - result.length).fill(0)];
     });
     const newGrid = rotateGrid(moved, 3);
     
@@ -248,15 +275,24 @@ export default function Game2048({ onScoreChange }: Game2048Props) {
   const moveDown = () => {
     const rotated = rotateGrid(grid);
     const moved = rotated.map(row => {
+      // First filter out zeros and create a new array
       const merged = row.filter(cell => cell !== 0);
-      for (let i = merged.length - 1; i > 0; i--) {
-        if (merged[i] === merged[i - 1]) {
-          merged[i] *= 2;
-          setScore(prev => prev + merged[i]);
-          merged.splice(i - 1, 1);
+      const result = [];
+      
+      // Iterate through the filtered array to merge pairs (from bottom to top)
+      for (let i = merged.length - 1; i >= 0; i--) {
+        if (i > 0 && merged[i] === merged[i - 1]) {
+          // Merge equal adjacent numbers
+          result.unshift(merged[i] * 2);
+          setScore(prev => prev + merged[i] * 2);
+          i--; // Skip next number since we merged it
+        } else {
+          result.unshift(merged[i]);
         }
       }
-      return [...Array(GRID_SIZE - merged.length).fill(0), ...merged];
+      
+      // Fill the remaining space with zeros
+      return [...Array(GRID_SIZE - result.length).fill(0), ...result];
     });
     const newGrid = rotateGrid(moved, 3);
     

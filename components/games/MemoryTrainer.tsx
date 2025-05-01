@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -20,10 +20,12 @@ const GRID_SIZE = 5;
 const INITIAL_VIEW_TIME = 5000; // 5 seconds
 const DECREASE_VIEW_TIME = 250; // Decrease view time by 250ms each level
 const MIN_VIEW_TIME = 1000; // Minimum 1 second viewing time
+const RECALL_TIME = 30; // 30 seconds to recall the pattern
 
 export default function MemoryTrainer({ onScoreChange }: MemoryTrainerProps) {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
+  const viewTimerRef = useRef<NodeJS.Timeout>();
 
   const [grid, setGrid] = useState<boolean[][]>([]);
   const [playerGrid, setPlayerGrid] = useState<boolean[][]>([]);
@@ -32,16 +34,46 @@ export default function MemoryTrainer({ onScoreChange }: MemoryTrainerProps) {
   const [gamePhase, setGamePhase] = useState<"view" | "recall" | "result">("view");
   const [viewTime, setViewTime] = useState(INITIAL_VIEW_TIME);
   const [gameOver, setGameOver] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(RECALL_TIME);
 
   useEffect(() => {
     startNewGame();
+    return () => {
+      if (viewTimerRef.current) {
+        clearTimeout(viewTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
     onScoreChange(score);
   }, [score, onScoreChange]);
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (gamePhase === "recall" && !gameOver) {
+      setTimeLeft(RECALL_TIME);
+      timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            checkResult();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [gamePhase, gameOver]);
+
   const startNewGame = () => {
+    if (viewTimerRef.current) {
+      clearTimeout(viewTimerRef.current);
+    }
+    
     const newGrid = Array(GRID_SIZE).fill(0).map(() =>
       Array(GRID_SIZE).fill(false).map(() => Math.random() < 0.4)
     );
@@ -51,12 +83,10 @@ export default function MemoryTrainer({ onScoreChange }: MemoryTrainerProps) {
     setGameOver(false);
 
     // Start recall phase after view time
-    setTimeout(() => {
-      if (gamePhase === "view") {
-        setGamePhase("recall");
-        if (Platform.OS !== "web") {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        }
+    viewTimerRef.current = setTimeout(() => {
+      setGamePhase("recall");
+      if (Platform.OS !== "web") {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
     }, viewTime);
   };
@@ -159,6 +189,12 @@ export default function MemoryTrainer({ onScoreChange }: MemoryTrainerProps) {
           </Text>
         </View>
 
+        {gamePhase === "recall" && !gameOver && (
+          <Text style={[styles.timer, { color: timeLeft <= 5 ? '#FF0000' : colors.text }]}>
+            Time: {timeLeft}s
+          </Text>
+        )}
+
         {renderGrid(gamePhase === "view" ? grid : playerGrid)}
 
         {gamePhase === "recall" && !gameOver && (
@@ -255,6 +291,12 @@ const styles = StyleSheet.create({
     color: "white",
     fontFamily: "Poppins-Medium",
     fontSize: 16,
+  },
+  timer: {
+    fontFamily: "Poppins-Medium",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 16,
   },
   gameOverContainer: {
     alignItems: "center",

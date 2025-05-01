@@ -79,6 +79,15 @@ export const allGames = [
     rating: 4.7,
     players: '1 Player',
   },
+  {
+    id: 'flappybird',
+    name: 'Flappy Bird',
+    description: 'Navigate through pipes in this addictive arcade game',
+    category: 'action',
+    image: 'https://images.unsplash.com/photo-1560419015-7c427e8ae5ba?q=80&w=500',
+    rating: 4.8,
+    players: '1 Player',
+  },
 ];
 
 // Featured games for the home screen

@@ -127,15 +127,23 @@ export default function Checkers({ onScoreChange }: CheckersProps) {
     if (!isPlayerTurn || gameOver) return;
 
     const piece = board[row][col];
+    const isValidMovePosition = validMoves.some(move => move.row === row && move.col === col);
+
+    // If clicking on a valid move position and we have a selected piece
+    if (selectedPiece && isValidMovePosition) {
+      movePiece(selectedPiece, { row, col });
+      return;
+    }
+
+    // If clicking on a player's piece
     if (piece?.isPlayer) {
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       setSelectedPiece({ row, col });
-      setValidMoves(getValidMoves(row, col));
+      const newValidMoves = getValidMoves(row, col);
+      setValidMoves(newValidMoves);
       animatePiece(row, col);
-    } else if (selectedPiece && validMoves.some(move => move.row === row && move.col === col)) {
-      movePiece(selectedPiece, { row, col });
     }
   };
 
@@ -159,16 +167,19 @@ export default function Checkers({ onScoreChange }: CheckersProps) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
 
-    const newBoard = board.map(row => [...row]);
+    const newBoard = JSON.parse(JSON.stringify(board)); // Deep clone to ensure no references
     const piece = { ...newBoard[from.row][from.col]! };
+    
+    // Clear the source position
+    newBoard[from.row][from.col] = null;
+    
+    // Place the piece in the new position
+    newBoard[to.row][to.col] = piece;
     
     // Check if piece becomes king
     if ((piece.isPlayer && to.row === 0) || (!piece.isPlayer && to.row === 7)) {
       piece.isKing = true;
     }
-
-    newBoard[from.row][from.col] = null;
-    newBoard[to.row][to.col] = piece;
 
     // Handle jumps (captures)
     if (Math.abs(from.row - to.row) === 2) {
@@ -184,13 +195,18 @@ export default function Checkers({ onScoreChange }: CheckersProps) {
       }
     }
 
+    // Update the board and clear selection
     setBoard(newBoard);
-    setSelectedPiece(null);
-    setValidMoves([]);
+    
+    // Only clear selection if it's player's move
+    if (piece.isPlayer) {
+      setSelectedPiece(null);
+      setValidMoves([]);
+    }
 
     // Check for game over
-    const remainingComputer = newBoard.flat().filter(p => p && !p.isPlayer).length;
-    const remainingPlayer = newBoard.flat().filter(p => p?.isPlayer).length;
+    const remainingComputer = newBoard.flat().filter((p: Piece | null) => p && !p.isPlayer).length;
+    const remainingPlayer = newBoard.flat().filter((p: Piece | null) => p?.isPlayer).length;
 
     if (remainingComputer === 0) {
       if (Platform.OS !== "web") {
@@ -203,9 +219,11 @@ export default function Checkers({ onScoreChange }: CheckersProps) {
     } else {
       if (piece.isPlayer) {
         setIsPlayerTurn(false);
-        // Computer's turn
+        // Computer's turn - use the updated board state
+        const updatedBoard = newBoard; // Store the latest board state
         setTimeout(() => {
-          makeComputerMove(newBoard);
+          // Pass the latest board state to makeComputerMove
+          makeComputerMove(updatedBoard);
         }, 500);
       } else {
         setIsPlayerTurn(true);
@@ -214,14 +232,15 @@ export default function Checkers({ onScoreChange }: CheckersProps) {
   };
 
   const makeComputerMove = (currentBoard: (Piece | null)[][]) => {
-    // Find all computer pieces and their possible moves
+    // Find all computer pieces and their possible moves using the current board state
     const moves: { from: Position; to: Position; isJump: boolean }[] = [];
     
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 8; col++) {
         const piece = currentBoard[row][col];
         if (piece && !piece.isPlayer) {
-          getValidMoves(row, col).forEach(move => {
+          // Use a modified getValidMoves that takes the current board state
+          getValidMovesForBoard(row, col, currentBoard).forEach(move => {
             moves.push({ 
               from: { row, col }, 
               to: move,
@@ -246,6 +265,39 @@ export default function Checkers({ onScoreChange }: CheckersProps) {
       }
       setScore(prev => prev + 50); // Player wins if computer has no moves
     }
+  };
+
+  const getValidMovesForBoard = (row: number, col: number, currentBoard: (Piece | null)[][]): Position[] => {
+    const piece = currentBoard[row][col];
+    if (!piece) return [];
+
+    const moves: Position[] = [];
+    const directions = piece.isKing ? [-1, 1] : piece.isPlayer ? [-1] : [1];
+
+    directions.forEach(rowDir => {
+      [-1, 1].forEach(colDir => {
+        // Regular move
+        const newRow = row + rowDir;
+        const newCol = col + colDir;
+        if (isValidPosition(newRow, newCol) && !currentBoard[newRow][newCol]) {
+          moves.push({ row: newRow, col: newCol });
+        }
+
+        // Jump move
+        const jumpRow = row + rowDir * 2;
+        const jumpCol = col + colDir * 2;
+        if (
+          isValidPosition(jumpRow, jumpCol) &&
+          !currentBoard[jumpRow][jumpCol] &&
+          currentBoard[newRow][newCol] &&
+          currentBoard[newRow][newCol]?.isPlayer !== piece.isPlayer
+        ) {
+          moves.push({ row: jumpRow, col: jumpCol });
+        }
+      });
+    });
+
+    return moves;
   };
 
   const renderCell = (row: number, col: number) => {
@@ -307,6 +359,11 @@ export default function Checkers({ onScoreChange }: CheckersProps) {
             {row.map((_, colIndex) => renderCell(rowIndex, colIndex))}
           </View>
         ))}
+      </View>
+
+      <View style={[styles.comingSoonOverlay, { backgroundColor: colors.background + 'E6' }]}>
+        <Text style={[styles.comingSoonText, { color: colors.text }]}>Coming Soon!</Text>
+        <Text style={[styles.comingSoonSubtext, { color: colors.textSecondary }]}>This game is under development</Text>
       </View>
 
       <Text style={[styles.instructions, { color: colors.textSecondary }]}>
@@ -383,5 +440,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 16,
     textAlign: "center",
+  },
+  comingSoonOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  comingSoonText: {
+    fontFamily: "Poppins-Bold",
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  comingSoonSubtext: {
+    fontFamily: "Poppins-Regular",
+    fontSize: 16,
   },
 });
