@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { 
   View, 
   Text, 
@@ -27,20 +27,161 @@ import {
 import { theme } from "@/constants/theme";
 import { useAuthStore } from "@/store/auth-store";
 import { useCoinsStore } from "@/store/coins-store";
+import { subscribeToUserProfile } from '@/firebaseConfig';
+import { Share as ShareAPI } from 'react-native';
 
-export default function ProfileScreen() {
+interface UserProfile {
+  coins: number;
+  achievements: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+function ProfileScreen() {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const { coins } = useCoinsStore();
+  const [userData, setUserData] = useState<UserProfile | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [unsubscribeProfile, setUnsubscribeProfile] = useState<(() => void) | undefined>();
 
-  const handleLogout = () => {
-    if (Platform.OS !== "web") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    if (user?.uid) {
+      unsubscribe = subscribeToUserProfile(user.uid, (data: UserProfile) => {
+        setUserData(data);
+      });
+      setUnsubscribeProfile(unsubscribe);
     }
-    logout();
-    router.replace("/(auth)/login");
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [user?.uid]);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    
+    setIsLoggingOut(true);
+    
+    try {
+      // Haptic feedback for logout action
+      if (Platform.OS !== "web") {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+
+      // Clean up profile subscription
+      if (typeof unsubscribeProfile === 'function') {
+        unsubscribeProfile();
+        setUnsubscribeProfile(undefined);
+      }
+
+      // Clear local state
+      setUserData(null);
+
+      // Perform logout which will handle platform-specific cleanup
+      await logout();
+      
+      // Navigate to signup screen
+      router.replace("/(auth)/signup");
+      
+    } catch (error) {
+      console.error("Logout failed:", error);
+      
+      // Error haptic feedback
+      if (Platform.OS !== "web") {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  const handleHaptic = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
+  const handleShare = async () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    try {
+      await ShareAPI.share({
+        message: "Join me on this awesome game app! 🚀 https://casualplayhub.com",
+      });
+    } catch (error) {
+      console.error("Share failed:", error);
+    }
+  };
+
+  const menuItems = [
+    {
+      icon: <User size={20} color={colors.primary} />,
+      title: "Edit Profile",
+      iconBg: colors.primaryLight,
+      onPress: () => {
+        handleHaptic();
+        router.push("/edit-profile");
+      }
+    },
+    {
+      icon: <Bell size={20} color="#10B981" />,
+      title: "Notifications",
+      iconBg: "rgba(16, 185, 129, 0.1)",
+      onPress: () => {
+        handleHaptic();
+        router.push("/settings");
+      }
+    },
+    {
+      icon: <HelpCircle size={20} color="#F59E0B" />,
+      title: "Help & Support",
+      iconBg: "rgba(245, 158, 11, 0.1)",
+      onPress: () => {
+        handleHaptic();
+        router.push("/modal");
+      }
+    },
+    {
+      icon: <Share2 size={20} color="#EC4899" />,
+      title: "Invite Friends",
+      iconBg: "rgba(236, 72, 153, 0.1)",
+      onPress: handleShare
+    },
+    {
+      icon: <LogOut size={20} color="#EF4444" />,
+      title: "Logout",
+      iconBg: "rgba(239, 68, 68, 0.1)",
+      color: "#EF4444",
+      onPress: handleLogout
+    }
+  ];
+
+  // Add a convert account button for guest users
+  const renderConvertAccount = () => {
+    if (!user?.isGuest) return null;
+
+    return (
+      <TouchableOpacity 
+        style={[styles.menuItem, { backgroundColor: colors.card }]}
+        activeOpacity={0.7}
+        onPress={() => router.push("/(auth)/signup")}
+      >
+        <View style={styles.menuItemLeft}>
+          <View style={[styles.menuItemIcon, { backgroundColor: colors.primaryLight }]}>
+            <User size={20} color={colors.primary} />
+          </View>
+          <Text style={[styles.menuItemText, { color: colors.text }]}>Create Full Account</Text>
+        </View>
+        <ChevronRight size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -71,7 +212,7 @@ export default function ProfileScreen() {
             style={styles.profileImage} 
           />
           <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: colors.text }]}>
+            <Text style={[styles.profileName, { color: colors.text }]}> 
               {user?.displayName || "Guest User"}
             </Text>
             <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
@@ -101,73 +242,25 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.menuSection}>
+          {renderConvertAccount()}
           <Text style={[styles.menuTitle, { color: colors.text }]}>Account Settings</Text>
           
-          <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: colors.card }]}
-            activeOpacity={0.7}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuItemIcon, { backgroundColor: "rgba(99, 102, 241, 0.1)" }]}>
-                <User size={20} color={colors.primary} />
+          {menuItems.map((item, index) => (
+            <TouchableOpacity 
+              key={index}
+              style={[styles.menuItem, { backgroundColor: colors.card }]}
+              activeOpacity={0.7}
+              onPress={item.onPress}
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={[styles.menuItemIcon, { backgroundColor: item.iconBg }]}>
+                  {item.icon}
+                </View>
+                <Text style={[styles.menuItemText, { color: item.color || colors.text }]}>{item.title}</Text>
               </View>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Edit Profile</Text>
-            </View>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: colors.card }]}
-            activeOpacity={0.7}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuItemIcon, { backgroundColor: "rgba(16, 185, 129, 0.1)" }]}>
-                <Bell size={20} color="#10B981" />
-              </View>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Notifications</Text>
-            </View>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: colors.card }]}
-            activeOpacity={0.7}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuItemIcon, { backgroundColor: "rgba(245, 158, 11, 0.1)" }]}>
-                <HelpCircle size={20} color="#F59E0B" />
-              </View>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Help & Support</Text>
-            </View>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: colors.card }]}
-            activeOpacity={0.7}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuItemIcon, { backgroundColor: "rgba(236, 72, 153, 0.1)" }]}>
-                <Share2 size={20} color="#EC4899" />
-              </View>
-              <Text style={[styles.menuItemText, { color: colors.text }]}>Invite Friends</Text>
-            </View>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.menuItem, { backgroundColor: colors.card }]}
-            activeOpacity={0.7}
-            onPress={handleLogout}
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuItemIcon, { backgroundColor: "rgba(239, 68, 68, 0.1)" }]}>
-                <LogOut size={20} color="#EF4444" />
-              </View>
-              <Text style={[styles.menuItemText, { color: "#EF4444" }]}>Logout</Text>
-            </View>
-            <ChevronRight size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
+              <ChevronRight size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ))}
         </View>
 
         <View style={styles.versionInfo}>
@@ -179,6 +272,8 @@ export default function ProfileScreen() {
     </SafeAreaView>
   );
 }
+
+export default ProfileScreen;
 
 const styles = StyleSheet.create({
   container: {

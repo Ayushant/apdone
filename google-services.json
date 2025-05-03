@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "129879073128",
+    "project_id": "new-app22",
+    "storage_bucket": "new-app22.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:129879073128:android:1b9bc5d83ed6c7de3f76dd",
+        "android_client_info": {
+          "package_name": "com.casualplayhub.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "129879073128-5s1skk8i8agjv0ta8996db4ksb8t8onu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.casualplayhub.app",
+            "certificate_hash": "093af95c179cdaa96e4c5250854e2958dc63e646"
+          }
+        },
+        {
+          "client_id": "129879073128-c3shlgchhfbn97vah2mcq35qcfrjmtsb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCsnf51uNNjdTIT0S0DjofvUvEXuhWZsZo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "129879073128-c3shlgchhfbn97vah2mcq35qcfrjmtsb.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

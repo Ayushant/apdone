@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -57,6 +57,7 @@ const CELL_TEXT_COLORS = {
 export default function Game2048({ onScoreChange }: Game2048Props) {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
+  const prevScoreRef = useRef(0);
   
   const [grid, setGrid] = useState<number[][]>(
     Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0))
@@ -147,9 +148,20 @@ export default function Game2048({ onScoreChange }: Game2048Props) {
     initializeGrid();
   }, []);
 
+  // Debounce score updates with proper dependencies
+  const debouncedScoreUpdate = useCallback((newScore: number) => {
+    if (newScore !== prevScoreRef.current) {
+      onScoreChange(newScore);
+      prevScoreRef.current = newScore;
+    }
+  }, [onScoreChange]);
+
   useEffect(() => {
-    onScoreChange(score);
-  }, [score, onScoreChange]);
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(score);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [score, debouncedScoreUpdate]);
 
   const initializeGrid = () => {
     const newGrid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));

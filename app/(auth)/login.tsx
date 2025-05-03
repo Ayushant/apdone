@@ -20,8 +20,9 @@ import * as Haptics from "expo-haptics";
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react-native";
 import { theme } from "@/constants/theme";
 import { useAuthStore } from "@/store/auth-store";
+import { signInWithGoogle, signIn } from '@/firebaseConfig';
 
-export default function LoginScreen() {
+function LoginScreen() {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
   const router = useRouter();
@@ -47,19 +48,19 @@ export default function LoginScreen() {
     setError("");
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      login({
-        id: "1",
-        email,
-        displayName: "John Doe",
-        photoURL: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=1000&auto=format&fit=crop",
-      });
-      
-      router.replace("/(tabs)");
-    } catch (err) {
-      setError("Invalid email or password");
+      const user = await signIn(email, password);
+      if (user) {
+        login({
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || '',
+          photoURL: user.photoURL || '',
+          phoneNumber: user.phoneNumber || undefined,
+        });
+        router.replace("/(tabs)");
+      }
+    } catch (err: any) {
+      setError(err.message || "Invalid email or password");
     } finally {
       setIsLoading(false);
     }
@@ -74,19 +75,12 @@ export default function LoginScreen() {
     setError("");
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      login({
-        id: "2",
-        email: "john.doe@example.com",
-        displayName: "John Doe",
-        photoURL: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=1000&auto=format&fit=crop",
-      });
-      
-      router.replace("/(tabs)");
-    } catch (err) {
-      setError("Google login failed");
+      const user = await signInWithGoogle();
+      if (user) {
+        router.replace("/(tabs)");
+      }
+    } catch (err: any) {
+      setError(err.message || "Google login failed");
     } finally {
       setIsLoading(false);
     }
@@ -281,6 +275,8 @@ export default function LoginScreen() {
     </SafeAreaView>
   );
 }
+
+export default LoginScreen;
 
 const styles = StyleSheet.create({
   container: {

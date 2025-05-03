@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -27,10 +27,21 @@ export default function TicTacToe({ onScoreChange }: TicTacToeProps) {
   const [gameOver, setGameOver] = useState(false);
   const [winningLine, setWinningLine] = useState<number[] | null>(null);
   const [cellScales] = useState(Array(9).fill(0).map(() => new Animated.Value(1)));
+  const prevScoreRef = useRef(0);
   
+  const debouncedScoreUpdate = useCallback((newScore: number) => {
+    if (newScore !== prevScoreRef.current) {
+      onScoreChange(newScore);
+      prevScoreRef.current = newScore;
+    }
+  }, [onScoreChange]);
+
   useEffect(() => {
-    onScoreChange(score);
-  }, [score, onScoreChange]);
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(score);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [score, debouncedScoreUpdate]);
 
   const animateCell = (index: number) => {
     Animated.sequence([

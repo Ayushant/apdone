@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ interface ConcentrationProps {
 export default function Concentration({ onScoreChange }: ConcentrationProps) {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
+  const prevScoreRef = useRef(0);
   const [cards, setCards] = useState<{ id: number; symbol: string; isFlipped: boolean; isMatched: boolean }[]>([]);
   const [selectedCards, setSelectedCards] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
@@ -34,11 +35,20 @@ export default function Concentration({ onScoreChange }: ConcentrationProps) {
     initializeGame();
   }, []);
 
-  // Update score when matches change
+  const debouncedScoreUpdate = useCallback((matchCount: number, moveCount: number) => {
+    const newScore = Math.max(0, matchCount * 50 - moveCount * 2);
+    if (newScore !== prevScoreRef.current) {
+      onScoreChange(newScore);
+      prevScoreRef.current = newScore;
+    }
+  }, [onScoreChange]);
+
   useEffect(() => {
-    const score = Math.max(0, matches * 50 - moves * 2);
-    onScoreChange(score);
-  }, [matches, moves, onScoreChange]);
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(matches, moves);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [matches, moves, debouncedScoreUpdate]);
 
   const initializeGame = () => {
     // Create pairs of cards

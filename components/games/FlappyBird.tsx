@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -35,6 +35,7 @@ const generatePipes = () => {
 export default function FlappyBird({ onScoreChange }: FlappyBirdProps) {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
+  const prevScoreRef = useRef(0);
 
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [score, setScore] = useState(0);
@@ -48,6 +49,20 @@ export default function FlappyBird({ onScoreChange }: FlappyBirdProps) {
   const physicsInterval = useRef<number>();
   const pipeInterval = useRef<number>();
   const pipes = useRef<{ top: number; bottom: number }>(generatePipes());
+
+  const debouncedScoreUpdate = useCallback((newScore: number) => {
+    if (newScore !== prevScoreRef.current) {
+      onScoreChange(newScore);
+      prevScoreRef.current = newScore;
+    }
+  }, [onScoreChange]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(score);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [score, debouncedScoreUpdate]);
 
   useEffect(() => {
     const birdListener = birdPosition.addListener(({ value }) => {

@@ -10,9 +10,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Download, ExternalLink } from "lucide-react-native";
+import { Gift, Coins, ExternalLink, ArrowRight } from "lucide-react-native";
 import { theme } from "../../constants/theme";
-import { offers } from "../../constants/offers";
+import { LinearGradient } from "expo-linear-gradient";
 
 export default function OffersScreen() {
   const colorScheme = useColorScheme() || "light";
@@ -23,73 +23,72 @@ export default function OffersScreen() {
       <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
       
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Special Offers</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Daily Tips & Offers</Text>
         <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-          Complete offers to earn coins
+          Learn how to earn more coins
         </Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.categoriesContainer}>
-          <TouchableOpacity 
-            style={[styles.categoryButton, { backgroundColor: colors.primary }]}
-            activeOpacity={0.8}
+        {/* Featured Offer Banner */}
+        <TouchableOpacity activeOpacity={0.9}>
+          <LinearGradient
+            colors={["#6366F1", "#8B5CF6"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.featuredOffer}
           >
-            <Text style={styles.categoryText}>All Offers</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.categoryButton, { backgroundColor: colors.card }]}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.categoryText, { color: colors.text }]}>Apps</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.categoryButton, { backgroundColor: colors.card }]}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.categoryText, { color: colors.text }]}>Surveys</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.categoryButton, { backgroundColor: colors.card }]}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.categoryText, { color: colors.text }]}>Videos</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.offersContainer}>
-          {offers.map((offer) => (
-            <TouchableOpacity 
-              key={offer.id}
-              style={[styles.offerCard, { backgroundColor: colors.card }]}
-              activeOpacity={0.9}
-            >
-              <Image source={{ uri: offer.image }} style={styles.offerImage} />
-              <View style={styles.offerContent}>
-                <Text style={[styles.offerTitle, { color: colors.text }]}>{offer.title}</Text>
-                <Text style={[styles.offerDescription, { color: colors.textSecondary }]}>
-                  {offer.description}
-                </Text>
-                <View style={styles.offerFooter}>
-                  <View style={[styles.coinBadge, { backgroundColor: colors.primaryLight }]}>
-                    <Text style={[styles.coinText, { color: colors.primary }]}>
-                      +{offer.coins} coins
-                    </Text>
-                  </View>
-                  <View style={styles.offerAction}>
-                    {offer.type === "download" ? (
-                      <Download size={16} color={colors.primary} />
-                    ) : (
-                      <ExternalLink size={16} color={colors.primary} />
-                    )}
-                    <Text style={[styles.offerActionText, { color: colors.primary }]}>
-                      {offer.type === "download" ? "Download" : "Visit"}
-                    </Text>
-                  </View>
-                </View>
+            <View style={styles.featuredContent}>
+              <Text style={styles.featuredLabel}>Featured Offer</Text>
+              <Text style={styles.featuredTitle}>Daily Login Bonus</Text>
+              <Text style={styles.featuredDescription}>
+                Login daily to earn bonus coins and keep your streak going!
+              </Text>
+              <View style={styles.featuredReward}>
+                <Coins size={16} color="#FFD700" />
+                <Text style={styles.rewardText}>+50 coins</Text>
               </View>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Tips Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Tips to Earn More</Text>
+          
+          <View style={styles.tipsContainer}>
+            <TouchableOpacity 
+              style={[styles.tipCard, { backgroundColor: colors.card }]}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.tipIcon, { backgroundColor: colors.primaryLight }]}>
+                <Gift size={20} color={colors.primary} />
+              </View>
+              <View style={styles.tipContent}>
+                <Text style={[styles.tipTitle, { color: colors.text }]}>Complete Daily Missions</Text>
+                <Text style={[styles.tipDescription, { color: colors.textSecondary }]}>
+                  Finish 3 missions to earn bonus coins
+                </Text>
+              </View>
+              <ArrowRight size={20} color={colors.primary} />
             </TouchableOpacity>
-          ))}
+
+            <TouchableOpacity 
+              style={[styles.tipCard, { backgroundColor: colors.card }]}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.tipIcon, { backgroundColor: "rgba(16, 185, 129, 0.1)" }]}> 
+                <ExternalLink size={20} color="#10B981" />
+              </View>
+              <View style={styles.tipContent}>
+                <Text style={[styles.tipTitle, { color: colors.text }]}>Invite Friends</Text>
+                <Text style={[styles.tipDescription, { color: colors.textSecondary }]}>
+                  Get 100 coins for each friend invited
+                </Text>
+              </View>
+              <ArrowRight size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -113,69 +112,85 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     fontSize: 14,
   },
-  categoriesContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+  featuredOffer: {
+    margin: 16,
+    borderRadius: 16,
+    overflow: "hidden",
   },
-  categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  featuredContent: {
+    padding: 20,
+  },
+  featuredLabel: {
+    fontFamily: "Poppins-Medium",
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.8)",
+    marginBottom: 8,
+  },
+  featuredTitle: {
+    fontFamily: "Poppins-Bold",
+    fontSize: 24,
+    color: "white",
+    marginBottom: 8,
+  },
+  featuredDescription: {
+    fontFamily: "Poppins-Regular",
+    fontSize: 14,
+    color: "rgba(255, 255, 255, 0.9)",
+    marginBottom: 16,
+  },
+  featuredReward: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
   },
-  categoryText: {
+  rewardText: {
     fontFamily: "Poppins-Medium",
     fontSize: 14,
     color: "white",
+    marginLeft: 6,
   },
-  offersContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
+  section: {
+    marginTop: 8,
   },
-  offerCard: {
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 16,
-  },
-  offerImage: {
-    width: "100%",
-    height: 140,
-  },
-  offerContent: {
-    padding: 16,
-  },
-  offerTitle: {
-    fontFamily: "Poppins-SemiBold",
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  offerDescription: {
-    fontFamily: "Poppins-Regular",
-    fontSize: 14,
+  sectionTitle: {
+    fontFamily: "Poppins-Bold",
+    fontSize: 18,
+    marginHorizontal: 16,
     marginBottom: 12,
   },
-  offerFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  tipsContainer: {
+    paddingHorizontal: 16,
   },
-  coinBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  tipCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
     borderRadius: 12,
+    marginBottom: 12,
   },
-  coinText: {
-    fontFamily: "Poppins-Medium",
-    fontSize: 14,
-  },
-  offerAction: {
-    flexDirection: "row",
+  tipIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
     alignItems: "center",
   },
-  offerActionText: {
+  tipContent: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  tipTitle: {
     fontFamily: "Poppins-Medium",
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  tipDescription: {
+    fontFamily: "Poppins-Regular",
     fontSize: 14,
-    marginLeft: 4,
   },
 });

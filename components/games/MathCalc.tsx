@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -30,6 +30,7 @@ const MAX_NUMBER = 12;
 export default function MathCalc({ onScoreChange }: MathCalcProps) {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
+  const prevScoreRef = useRef(0);
   
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(TIME_LIMIT);
@@ -40,6 +41,20 @@ export default function MathCalc({ onScoreChange }: MathCalcProps) {
   const [buttonScales] = useState(() => 
     Array(4).fill(0).map(() => new Animated.Value(1))
   );
+
+  const debouncedScoreUpdate = useCallback((newScore: number) => {
+    if (newScore !== prevScoreRef.current) {
+      onScoreChange(newScore);
+      prevScoreRef.current = newScore;
+    }
+  }, [onScoreChange]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(score);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [score, debouncedScoreUpdate]);
 
   const generateProblem = useCallback(() => {
     const operations: Operation[] = ['+', '-', 'x', '÷'];
@@ -86,10 +101,6 @@ export default function MathCalc({ onScoreChange }: MathCalcProps) {
   useEffect(() => {
     generateProblem();
   }, [generateProblem]);
-
-  useEffect(() => {
-    onScoreChange(score);
-  }, [score, onScoreChange]);
 
   useEffect(() => {
     if (timeLeft <= 0) {

@@ -5,28 +5,23 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  useColorScheme 
+  useColorScheme,
+  Platform
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
-import { Platform } from "react-native";
-import { Coins, ArrowDown, ArrowUp, Gift, Clock, RefreshCw } from "lucide-react-native";
+import { Coins, Gift, Clock } from "lucide-react-native";
 import { theme } from "@/constants/theme";
 import { useCoinsStore } from "@/store/coins-store";
-import { transactionHistory } from "../../constants/transactions";
+import { useAuthStore } from "@/store/auth-store";
 
 export default function WalletScreen() {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
   const { coins } = useCoinsStore();
-
-  const handleRedeemPress = () => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
-  };
+  const { user } = useAuthStore();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -37,146 +32,38 @@ export default function WalletScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Balance Card */}
         <LinearGradient
           colors={["#6366F1", "#8B5CF6"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.balanceCard}
         >
-          <View style={styles.balanceHeader}>
-            <Text style={styles.balanceLabel}>Total Balance</Text>
-            <TouchableOpacity 
-              style={styles.refreshButton}
-              onPress={() => {
-                if (Platform.OS !== "web") {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }
-              }}
-            >
-              <RefreshCw size={16} color="white" />
-            </TouchableOpacity>
-          </View>
-          
+          <Text style={styles.balanceLabel}>Total Balance</Text>
           <View style={styles.balanceAmount}>
             <Coins size={32} color="white" />
             <Text style={styles.balanceValue}>{coins}</Text>
           </View>
-          
-          <View style={styles.balanceActions}>
-            <TouchableOpacity 
-              style={styles.balanceActionButton}
-              onPress={() => {
-                if (Platform.OS !== "web") {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }
-              }}
-            >
-              <ArrowDown size={16} color="white" />
-              <Text style={styles.balanceActionText}>Earn</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.balanceActionButton, styles.redeemButton]}
-              onPress={handleRedeemPress}
-            >
-              <ArrowUp size={16} color="#6366F1" />
-              <Text style={[styles.balanceActionText, { color: "#6366F1" }]}>Redeem</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.balanceHint}>Play games to earn more coins!</Text>
         </LinearGradient>
 
-        <View style={styles.rewardsSection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Rewards</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.rewardsContainer}
-          >
-            <TouchableOpacity 
-              style={[styles.rewardCard, { backgroundColor: colors.card }]}
-              activeOpacity={0.9}
-            >
-              <View style={[styles.rewardIconContainer, { backgroundColor: "#F59E0B" }]}>
-                <Gift size={24} color="white" />
-              </View>
-              <Text style={[styles.rewardTitle, { color: colors.text }]}>Amazon Gift Card</Text>
-              <Text style={[styles.rewardPrice, { color: colors.primary }]}>5000 coins</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.rewardCard, { backgroundColor: colors.card }]}
-              activeOpacity={0.9}
-            >
-              <View style={[styles.rewardIconContainer, { backgroundColor: "#10B981" }]}>
-                <Gift size={24} color="white" />
-              </View>
-              <Text style={[styles.rewardTitle, { color: colors.text }]}>Google Play Card</Text>
-              <Text style={[styles.rewardPrice, { color: colors.primary }]}>3000 coins</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.rewardCard, { backgroundColor: colors.card }]}
-              activeOpacity={0.9}
-            >
-              <View style={[styles.rewardIconContainer, { backgroundColor: "#EC4899" }]}>
-                <Gift size={24} color="white" />
-              </View>
-              <Text style={[styles.rewardTitle, { color: colors.text }]}>PayPal Cash</Text>
-              <Text style={[styles.rewardPrice, { color: colors.primary }]}>10000 coins</Text>
-            </TouchableOpacity>
-          </ScrollView>
+        {/* Coming Soon Section */}
+        <View style={styles.comingSoonSection}>
+          <View style={[styles.comingSoonCard, { backgroundColor: colors.card }]}>
+            <Gift size={24} color={colors.primary} />
+            <Text style={[styles.comingSoonTitle, { color: colors.text }]}>Exciting Rewards Coming Soon</Text>
+            <Text style={[styles.comingSoonText, { color: colors.textSecondary }]}>Soon you'll be able to redeem your coins for amazing rewards! Keep collecting coins.</Text>
+          </View>
         </View>
 
-        <View style={styles.historySection}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Transaction History</Text>
-          
-          {transactionHistory?.map((transaction) => (
-            <View 
-              key={transaction.id}
-              style={[styles.transactionItem, { backgroundColor: colors.card }]}
-            >
-              <View style={styles.transactionLeft}>
-                <View 
-                  style={[
-                    styles.transactionIcon, 
-                    { 
-                      backgroundColor: transaction.type === "earned" 
-                        ? "rgba(16, 185, 129, 0.1)" 
-                        : "rgba(239, 68, 68, 0.1)" 
-                    }
-                  ]}
-                >
-                  {transaction.type === "earned" ? (
-                    <ArrowDown size={16} color="#10B981" />
-                  ) : (
-                    <ArrowUp size={16} color="#EF4444" />
-                  )}
-                </View>
-                <View>
-                  <Text style={[styles.transactionTitle, { color: colors.text }]}>
-                    {transaction.title}
-                  </Text>
-                  <View style={styles.transactionMeta}>
-                    <Clock size={12} color={colors.textSecondary} />
-                    <Text style={[styles.transactionDate, { color: colors.textSecondary }]}>
-                      {transaction.date}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              
-              <Text 
-                style={[
-                  styles.transactionAmount, 
-                  { 
-                    color: transaction.type === "earned" ? "#10B981" : "#EF4444" 
-                  }
-                ]}
-              >
-                {transaction.type === "earned" ? "+" : "-"}{transaction.amount}
-              </Text>
-            </View>
-          )) || null}
+        {/* Empty Transaction Section */}
+        <View style={styles.transactionsSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
+          <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+            <Clock size={32} color={colors.textSecondary} />
+            <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No Transactions Yet</Text>
+            <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>Start playing games to see your coin history here</Text>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -200,29 +87,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
   },
-  balanceHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
   balanceLabel: {
     fontFamily: "Poppins-Medium",
     fontSize: 14,
     color: "rgba(255, 255, 255, 0.8)",
   },
-  refreshButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   balanceAmount: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 12,
-    marginBottom: 20,
   },
   balanceValue: {
     fontFamily: "Poppins-Bold",
@@ -230,108 +103,57 @@ const styles = StyleSheet.create({
     color: "white",
     marginLeft: 8,
   },
-  balanceActions: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  balanceActionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    width: "48%",
-  },
-  redeemButton: {
-    backgroundColor: "white",
-  },
-  balanceActionText: {
-    fontFamily: "Poppins-Medium",
+  balanceHint: {
+    fontFamily: "Poppins-Regular",
     fontSize: 14,
-    color: "white",
-    marginLeft: 6,
-  },
-  rewardsSection: {
+    color: "rgba(255, 255, 255, 0.8)",
     marginTop: 8,
   },
-  sectionTitle: {
-    fontFamily: "Poppins-Bold",
-    fontSize: 18,
-    marginHorizontal: 16,
-    marginBottom: 12,
-  },
-  rewardsContainer: {
+  comingSoonSection: {
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    marginTop: 8,
   },
-  rewardCard: {
-    width: 150,
+  comingSoonCard: {
     borderRadius: 16,
-    padding: 16,
-    marginRight: 12,
+    padding: 20,
     alignItems: "center",
   },
-  rewardIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
+  comingSoonTitle: {
+    fontFamily: "Poppins-SemiBold",
+    fontSize: 18,
+    marginTop: 12,
+    marginBottom: 4,
+    textAlign: "center",
   },
-  rewardTitle: {
-    fontFamily: "Poppins-Medium",
+  comingSoonText: {
+    fontFamily: "Poppins-Regular",
     fontSize: 14,
     textAlign: "center",
-    marginBottom: 4,
   },
-  rewardPrice: {
-    fontFamily: "Poppins-SemiBold",
-    fontSize: 14,
-  },
-  historySection: {
+  transactionsSection: {
     marginTop: 24,
     paddingHorizontal: 16,
     paddingBottom: 24,
   },
-  transactionItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+  sectionTitle: {
+    fontFamily: "Poppins-Bold",
+    fontSize: 18,
+    marginBottom: 12,
   },
-  transactionLeft: {
-    flexDirection: "row",
+  emptyState: {
+    borderRadius: 16,
+    padding: 24,
     alignItems: "center",
   },
-  transactionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  transactionTitle: {
-    fontFamily: "Poppins-Medium",
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  transactionMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  transactionDate: {
-    fontFamily: "Poppins-Regular",
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  transactionAmount: {
+  emptyStateTitle: {
     fontFamily: "Poppins-SemiBold",
     fontSize: 16,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyStateText: {
+    fontFamily: "Poppins-Regular",
+    fontSize: 14,
+    textAlign: "center",
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { ChevronLeft, Trophy, Coins } from "lucide-react-native";
 import { theme } from "@/constants/theme";
 import { allGames } from "@/constants/games";
 import { useCoinsStore } from "@/store/coins-store";
+import { useAuthStore } from "@/store/auth-store";
 import TicTacToe from "@/components/games/TicTacToe";
 import Sudoku from "@/components/games/Sudoku";
 import BlockPuzzle from "@/components/games/BlockPuzzle";
@@ -27,28 +28,65 @@ import Checkers from "@/components/games/Checkers";
 import FlappyBird from "@/components/games/FlappyBird";
 
 export default function GameScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
   const router = useRouter();
-  const { addCoins } = useCoinsStore();
-  
-  const [isLoading, setIsLoading] = useState(true);
-  const [game, setGame] = useState<any>(null);
+  const { id } = useLocalSearchParams();
+  const { user } = useAuthStore();
+  const { addCoins, isLoading } = useCoinsStore();
   const [score, setScore] = useState(0);
-  
+  const [currentGame, setCurrentGame] = useState(allGames.find(g => g.id === id));
+  const previousScore = useRef(0);
+  const isInitialMount = useRef(true);
+
+  // Track pending coin rewards
+  const pendingCoins = useRef(0);
+
+  // Process coin rewards with debouncing
   useEffect(() => {
-    const loadGame = async () => {
-      // Simulate loading
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const foundGame = allGames.find(g => g.id === id);
-      setGame(foundGame);
-      setIsLoading(false);
-    };
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    if (pendingCoins.current > 0 && user?.uid && !user.isGuest) {
+      const timer = setTimeout(async () => {
+        try {
+          await addCoins(pendingCoins.current);
+          pendingCoins.current = 0;
+        } catch (error) {
+          console.error('Failed to award coins:', error);
+          // Could show an error toast here
+        }
+      }, 2000); // Debounce coin updates
+
+      return () => clearTimeout(timer);
+    }
+  }, [score, user?.uid]);
+
+  const handleScoreChange = useCallback((newScore: number) => {
+    setScore(newScore);
     
-    loadGame();
-  }, [id]);
+    // Only award coins for non-guest users
+    if (!isInitialMount.current && user?.uid && !user.isGuest) {
+      // Award coins for every 50 point milestone
+      const previousMilestone = Math.floor(previousScore.current / 50);
+      const newMilestone = Math.floor(newScore / 50);
+      
+      if (newMilestone > previousMilestone) {
+        // Calculate coins to award (10 coins per milestone)
+        const coinsToAward = (newMilestone - previousMilestone) * 10;
+        pendingCoins.current += coinsToAward;
+
+        // Could show a toast notification here
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      }
+    }
+    
+    previousScore.current = newScore;
+  }, [user?.uid]);
 
   const handleBack = () => {
     if (Platform.OS !== "web") {
@@ -57,64 +95,17 @@ export default function GameScreen() {
     router.back();
   };
 
-  const handleScoreChange = (newScore: number) => {
-    setScore(newScore);
-    
-    // Award coins based on score milestones
-    if (newScore % 50 === 0 && newScore > 0) {
-      if (Platform.OS !== "web") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      addCoins(10);
-    }
-  };
+  if (!currentGame) return null;
 
-  const renderGame = () => {
-    if (!game) return null;
-    
-    switch (game.id) {
-      case "tictactoe":
-        return <TicTacToe onScoreChange={handleScoreChange} />;
-      case "sudoku":
-        return <Sudoku onScoreChange={handleScoreChange} />;
-      case "blockpuzzle":
-        return <BlockPuzzle onScoreChange={handleScoreChange} />;
-      case "mathcalc":
-        return <MathCalc onScoreChange={handleScoreChange} />;
-      case "game2048":
-        return <Game2048 onScoreChange={handleScoreChange} />;
-      case "memorytrainer":
-        return <MemoryTrainer onScoreChange={handleScoreChange} />;
-      case "concentration":
-        return <Concentration onScoreChange={handleScoreChange} />;
-      case "checkers":
-        return <Checkers onScoreChange={handleScoreChange} />;
-      case "flappybird":
-        return <FlappyBird onScoreChange={handleScoreChange} />;
-      default:
-        return (
-          <View style={styles.placeholderContainer}>
-            <Text style={[styles.placeholderText, { color: colors.text }]}>
-              Game coming soon!
-            </Text>
-          </View>
-        );
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.text }]}>
-            Loading game...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const GameComponent = {
+    tictactoe: TicTacToe,
+    sudoku: Sudoku,
+    blockpuzzle: BlockPuzzle,
+    mathcalc: MathCalc,
+    game2048: Game2048,
+    memorytrainer: MemoryTrainer,
+    flappybird: FlappyBird
+  }[currentGame.id];
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -124,35 +115,35 @@ export default function GameScreen() {
         <TouchableOpacity 
           style={[styles.backButton, { backgroundColor: colors.card }]}
           onPress={handleBack}
+          activeOpacity={0.7}
         >
-          <ChevronLeft size={20} color={colors.text} />
+          <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {game?.name || "Game"}
-        </Text>
-        
-        <View style={styles.placeholder} />
-      </View>
-      
-      <View style={styles.scoreContainer}>
-        <View style={[styles.scoreItem, { backgroundColor: colors.card }]}>
-          <Trophy size={16} color={colors.gold} />
-          <Text style={[styles.scoreText, { color: colors.text }]}>
-            Score: {score}
-          </Text>
+
+        <View style={styles.headerInfo}>
+          <Text style={[styles.gameTitle, { color: colors.text }]}>{currentGame.name}</Text>
+          <View style={styles.scoreContainer}>
+            <Trophy size={16} color={colors.primary} />
+            <Text style={[styles.scoreText, { color: colors.text }]}>{score}</Text>
+          </View>
         </View>
-        
-        <View style={[styles.scoreItem, { backgroundColor: colors.card }]}>
-          <Coins size={16} color={colors.gold} />
-          <Text style={[styles.scoreText, { color: colors.text }]}>
-            Earned: {Math.floor(score / 50) * 10}
-          </Text>
-        </View>
+
+        {user && !user.isGuest && (
+          <View style={[styles.coinsDisplay, { backgroundColor: colors.card }]}>
+            <Coins size={16} color={colors.gold} />
+            {isLoading ? (
+              <ActivityIndicator size="small" color={colors.text} style={{ marginLeft: 4 }} />
+            ) : (
+              <Text style={[styles.coinsText, { color: colors.text }]}>+{pendingCoins.current}</Text>
+            )}
+          </View>
+        )}
       </View>
-      
+
       <View style={styles.gameContainer}>
-        {renderGame()}
+        {GameComponent && (
+          <GameComponent onScoreChange={handleScoreChange} />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -187,29 +178,23 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  headerTitle: {
+  headerInfo: {
+    flex: 1,
+    alignItems: "center",
+    marginHorizontal: 12,
+  },
+  gameTitle: {
     fontFamily: "Poppins-SemiBold",
     fontSize: 18,
-  },
-  placeholder: {
-    width: 40,
+    marginBottom: 4,
   },
   scoreContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  scoreItem: {
-    flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
   },
   scoreText: {
     fontFamily: "Poppins-Medium",
-    fontSize: 14,
+    fontSize: 16,
     marginLeft: 6,
   },
   gameContainer: {
@@ -226,5 +211,17 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Medium",
     fontSize: 18,
     textAlign: "center",
+  },
+  coinsDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+  },
+  coinsText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+    marginLeft: 4,
   },
 });

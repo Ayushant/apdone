@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -50,6 +50,7 @@ const generateSudoku = (emptyCells: number) => {
 export default function Sudoku({ onScoreChange }: SudokuProps) {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
+  const prevScoreRef = useRef(0);
   
   const [score, setScore] = useState(0);
   const [selectedCell, setSelectedCell] = useState<number | null>(null);
@@ -61,9 +62,19 @@ export default function Sudoku({ onScoreChange }: SudokuProps) {
     generatePuzzle();
   }, [difficulty]);
   
+  const debouncedScoreUpdate = useCallback((newScore: number) => {
+    if (newScore !== prevScoreRef.current) {
+      onScoreChange(newScore);
+      prevScoreRef.current = newScore;
+    }
+  }, [onScoreChange]);
+
   useEffect(() => {
-    onScoreChange(score);
-  }, [score, onScoreChange]);
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(score);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [score, debouncedScoreUpdate]);
 
   const generatePuzzle = () => {
     const emptyCells = difficulty === "easy" ? 30 : difficulty === "medium" ? 45 : 55;
@@ -138,7 +149,7 @@ export default function Sudoku({ onScoreChange }: SudokuProps) {
                     style={[
                       styles.cellText,
                       {
-                        color: puzzle[index] === solution[index] ? colors.text : colors.error,
+                        color: puzzle[index] === solution[index] ? colors.text : colors.primary,
                         fontFamily: solution[index] === puzzle[index] ? "Poppins-Bold" : "Poppins-Regular"
                       }
                     ]}

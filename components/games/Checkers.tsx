@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -34,26 +34,57 @@ type Position = {
 export default function Checkers({ onScoreChange }: CheckersProps) {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
+  const prevScoreRef = useRef(0);
+  
+  const [board, setBoard] = useState<(Piece | null)[][]>(() => {
+    const newBoard: (Piece | null)[][] = Array(8)
+      .fill(null)
+      .map(() => Array(8).fill(null));
 
-  const [board, setBoard] = useState<(Piece | null)[][]>([]);
+    // Place player's pieces (bottom)
+    for (let row = 5; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        if ((row + col) % 2 === 1) {
+          newBoard[row][col] = { isKing: false, isPlayer: true };
+        }
+      }
+    }
+
+    // Place computer's pieces (top)
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 8; col++) {
+        if ((row + col) % 2 === 1) {
+          newBoard[row][col] = { isKing: false, isPlayer: false };
+        }
+      }
+    }
+
+    return newBoard;
+  });
   const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
   const [validMoves, setValidMoves] = useState<Position[]>([]);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
-  const [animations] = useState(
-    Array(8).fill(0).map(() => 
+  const [animations] = useState(() => 
+    Array(8).fill(0).map(() =>
       Array(8).fill(0).map(() => new Animated.Value(1))
     )
   );
 
-  useEffect(() => {
-    initializeBoard();
-  }, []);
+  const debouncedScoreUpdate = useCallback((newScore: number) => {
+    if (newScore !== prevScoreRef.current) {
+      onScoreChange(newScore);
+      prevScoreRef.current = newScore;
+    }
+  }, [onScoreChange]);
 
   useEffect(() => {
-    onScoreChange(score);
-  }, [score, onScoreChange]);
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(score);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [score, debouncedScoreUpdate]);
 
   const initializeBoard = () => {
     const newBoard: (Piece | null)[][] = Array(8)

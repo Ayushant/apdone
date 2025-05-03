@@ -20,12 +20,13 @@ import * as Haptics from "expo-haptics";
 import { User, Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react-native";
 import { theme } from "@/constants/theme";
 import { useAuthStore } from "@/store/auth-store";
+import { signInWithGoogle, createUserProfile } from '@/firebaseConfig';
 
 export default function SignupScreen() {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { signup } = useAuthStore();
   
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -53,19 +54,14 @@ export default function SignupScreen() {
     setError("");
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      login({
-        id: "3",
-        email,
+      await signup(email, password, {
         displayName: name,
         photoURL: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=1000&auto=format&fit=crop",
       });
       
       router.replace("/(tabs)");
-    } catch (err) {
-      setError("Failed to create account");
+    } catch (err: any) {
+      setError(err.message || "Failed to create account");
     } finally {
       setIsLoading(false);
     }
@@ -80,21 +76,39 @@ export default function SignupScreen() {
     setError("");
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      login({
-        id: "4",
-        email: "john.doe@example.com",
-        displayName: "John Doe",
-        photoURL: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=1000&auto=format&fit=crop",
-      });
-      
-      router.replace("/(tabs)");
-    } catch (err) {
-      setError("Google signup failed");
+      const user = await signInWithGoogle();
+      if (user) {
+        await createUserProfile(user.uid, {
+          displayName: user.displayName,
+          email: user.email,
+          photoURL: user.photoURL,
+          coins: 0,
+          achievements: [],
+        });
+        router.replace("/(tabs)"); // Changed from push to replace
+      }
+    } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        setError('Sign in was cancelled');
+        return;
+      }
+      setError(err.message || "Google signup failed");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePhoneLogin = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    try {
+      // Always use replace to avoid findLast issues
+      router.replace("/(auth)/phone-login");
+    } catch (err) {
+      console.error("Navigation error:", err);
+      setError("Failed to navigate to phone login");
     }
   };
 
@@ -260,7 +274,7 @@ export default function SignupScreen() {
                   marginTop: 12,
                 }
               ]}
-              onPress={() => router.push("/(auth)/phone-login")}
+              onPress={handlePhoneLogin}
               disabled={isLoading}
             >
               <Image
@@ -288,12 +302,13 @@ export default function SignupScreen() {
               if (Platform.OS !== "web") {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }
-              login(null);
+              const { loginAsGuest } = useAuthStore.getState();
+              loginAsGuest();
               router.replace("/(tabs)");
             }}
           >
             <Text style={[styles.skipButtonText, { color: colors.textSecondary }]}>
-              Skip for now
+              Continue as Guest
             </Text>
           </TouchableOpacity>
         </ScrollView>

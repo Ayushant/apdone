@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,8 +19,10 @@ import * as Haptics from "expo-haptics";
 import { Phone, ChevronLeft, AlertCircle } from "lucide-react-native";
 import { theme } from "../../constants/theme";
 import { useAuthStore } from "../../store/auth-store";
+import { PhoneAuthProvider, signInWithCredential } from 'firebase/auth';
+import { auth } from '@/firebaseConfig';
 
-export default function PhoneLoginScreen() {
+function PhoneLoginScreen() {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
   const router = useRouter();
@@ -31,6 +33,23 @@ export default function PhoneLoginScreen() {
   const [step, setStep] = useState(1); // 1: Phone number, 2: Verification code
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [verificationId, setVerificationId] = useState<string>("");
+  const recaptchaVerifier = useRef<any>(null);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      // Initialize reCAPTCHA when component mounts
+      const { RecaptchaVerifier } = require('firebase/auth');
+      recaptchaVerifier.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        size: 'invisible',
+      });
+    }
+    return () => {
+      if (recaptchaVerifier.current) {
+        recaptchaVerifier.current.clear();
+      }
+    };
+  }, []);
 
   const handleSendCode = async () => {
     if (Platform.OS !== "web") {
@@ -46,11 +65,37 @@ export default function PhoneLoginScreen() {
     setError("");
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+
+      if (Platform.OS === 'web') {
+        if (!recaptchaVerifier.current) {
+          setError('reCAPTCHA verification failed');
+          return;
+        }
+        const provider = new PhoneAuthProvider(auth);
+        const verificationId = await provider.verifyPhoneNumber(
+          formattedPhone,
+          recaptchaVerifier.current
+        );
+        setVerificationId(verificationId);
+      } else {
+        // For mobile platforms, use signInWithPhoneNumber
+        const { signInWithPhoneNumber } = await import('firebase/auth');
+        const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone);
+        setVerificationId(confirmationResult.verificationId);
+      }
+      
       setStep(2);
-    } catch (err) {
-      setError("Failed to send verification code");
+    } catch (err: any) {
+      if (err.code === 'auth/invalid-phone-number') {
+        setError('Invalid phone number format');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many attempts. Please try again later');
+      } else if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        setError('Verification was cancelled');
+      } else {
+        setError(err.message || "Failed to send verification code");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +106,7 @@ export default function PhoneLoginScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
     
-    if (!verificationCode || verificationCode.length < 4) {
+    if (!verificationCode || verificationCode.length < 6) {
       setError("Please enter a valid verification code");
       return;
     }
@@ -70,20 +115,41 @@ export default function PhoneLoginScreen() {
     setError("");
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const credential = PhoneAuthProvider.credential(verificationId, verificationCode);
+      const userCredential = await signInWithCredential(auth, credential);
       
-      login({
-        id: "5",
-        email: `${phoneNumber}@phone.user`,
-        displayName: "Phone User",
-        photoURL: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=1000&auto=format&fit=crop",
-        phoneNumber,
-      });
+      if (userCredential.user) {
+        login({
+          uid: userCredential.user.uid,
+          phoneNumber: userCredential.user.phoneNumber || '',
+          displayName: userCredential.user.displayName || 'Phone User',
+          photoURL: userCredential.user.photoURL || "https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=1000&auto=format&fit=crop",
+          email: userCredential.user.email || '',
+        });
+        
+        // Use replace to avoid findLast issues
+        router.replace("/(tabs)");
+      }
+    } catch (err: any) {
+      if (err.code === 'auth/invalid-verification-code') {
+        setError('Invalid verification code');
+      } else if (err.code === 'auth/code-expired') {
+        setError('Verification code has expired');
+        setStep(1);
+      } else {
+        setError(err.message || "Failed to verify code");
+      }
       
-      router.replace("/(tabs)");
-    } catch (err) {
-      setError("Invalid verification code");
+      // Clear reCAPTCHA if needed
+      if (Platform.OS === 'web' && recaptchaVerifier.current) {
+        recaptchaVerifier.current.clear();
+        recaptchaVerifier.current = null;
+        // Reinitialize reCAPTCHA
+        const { RecaptchaVerifier } = require('firebase/auth');
+        recaptchaVerifier.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+          size: 'invisible',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -122,6 +188,7 @@ export default function PhoneLoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.content}>
+            {Platform.OS === 'web' && <div id="recaptcha-container" />}
             <LinearGradient
               colors={["#6366F1", "#8B5CF6"]}
               start={{ x: 0, y: 0 }}
@@ -237,6 +304,8 @@ export default function PhoneLoginScreen() {
     </SafeAreaView>
   );
 }
+
+export default PhoneLoginScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -377,5 +446,10 @@ const styles = StyleSheet.create({
   skipButtonText: {
     fontFamily: "Poppins-Medium",
     fontSize: 14,
+  },
+  logoText: {
+    fontFamily: "Poppins-Bold",
+    fontSize: 32,
+    color: "white",
   },
 });

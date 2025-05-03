@@ -43,7 +43,7 @@ const onboardingData = [
   },
 ];
 
-export default function OnboardingScreen() {
+function OnboardingScreen() {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
   const router = useRouter();
@@ -209,6 +209,8 @@ export default function OnboardingScreen() {
     </SafeAreaView>
   );
 }
+
+export default OnboardingScreen;
 
 const styles = StyleSheet.create({
   container: {

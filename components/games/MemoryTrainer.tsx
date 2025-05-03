@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ export default function MemoryTrainer({ onScoreChange }: MemoryTrainerProps) {
   const colorScheme = useColorScheme() || "light";
   const colors = theme[colorScheme];
   const viewTimerRef = useRef<NodeJS.Timeout>();
+  const prevScoreRef = useRef(0);
 
   const [grid, setGrid] = useState<boolean[][]>([]);
   const [playerGrid, setPlayerGrid] = useState<boolean[][]>([]);
@@ -45,9 +46,19 @@ export default function MemoryTrainer({ onScoreChange }: MemoryTrainerProps) {
     };
   }, []);
 
+  const debouncedScoreUpdate = useCallback((newScore: number) => {
+    if (newScore !== prevScoreRef.current) {
+      onScoreChange(newScore);
+      prevScoreRef.current = newScore;
+    }
+  }, [onScoreChange]);
+
   useEffect(() => {
-    onScoreChange(score);
-  }, [score, onScoreChange]);
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(score);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [score, debouncedScoreUpdate]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;

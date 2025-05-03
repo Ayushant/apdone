@@ -77,6 +77,17 @@ export default function BlockPuzzle({ onScoreChange }: BlockPuzzleProps) {
   const [lastValidPosition, setLastValidPosition] = useState<{ row: number, col: number } | null>(null);
   const [validPosition, setValidPosition] = useState(false);
   const snapAnimation = useRef(new Animated.Value(0)).current;
+  const prevScoreRef = useRef(0);
+
+  useEffect(() => {
+    if (score !== prevScoreRef.current) {
+      const timer = setTimeout(() => {
+        onScoreChange(score);
+        prevScoreRef.current = score;
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [score, onScoreChange]);
 
   // Add animation styles for valid position feedback
   const blockAnimatedStyle = {
@@ -170,9 +181,18 @@ export default function BlockPuzzle({ onScoreChange }: BlockPuzzleProps) {
     generateNewBlock();
   }, []);
   
+  // Debounce score updates
+  const debouncedScoreUpdate = useCallback((newScore: number) => {
+    onScoreChange(newScore);
+  }, [onScoreChange]);
+
   useEffect(() => {
-    onScoreChange(score);
-  }, [score, onScoreChange]);
+    // Introduce a small delay to avoid rapid updates
+    const timer = setTimeout(() => {
+      debouncedScoreUpdate(score);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [score, debouncedScoreUpdate]);
 
   // Falling block logic
   useEffect(() => {
