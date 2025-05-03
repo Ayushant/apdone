@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { signIn, signUp, logOut, createUserProfile, auth } from '../firebaseConfig';
+import { signIn, signUp, logOut, createUserProfile, auth, getAuthToken } from '../firebaseConfig';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
@@ -7,7 +7,7 @@ import { useCoinsStore } from './coins-store';
 
 interface User {
   uid: string;
-  email: string;
+  email: string | null;
   displayName: string;
   photoURL: string;
   phoneNumber?: string;
@@ -18,37 +18,83 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   hasCompletedOnboarding: boolean;
+  isInitialized: boolean;
+  token: string | null;
   login: (user: User | null) => void;
   signup: (email: string, password: string, userData: Partial<User>) => Promise<void>;
   logout: () => Promise<void>;
   loginAsGuest: () => void;
   completeOnboarding: () => void;
+  refreshToken: () => Promise<string | null>;
 }
 
-export const useAuthStore = create<AuthState>((set) => {
-  // Auth state listener setup
+export const useAuthStore = create<AuthState>((set, get) => {
   let unsubscribeAuth: (() => void) | null = null;
-  
-  unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-    if (firebaseUser) {
-      const user: User = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        displayName: firebaseUser.displayName || '',
-        photoURL: firebaseUser.photoURL || '',
-        phoneNumber: firebaseUser.phoneNumber || undefined,
-      };
-      set({ user, isAuthenticated: true });
-    } else {
-      set({ user: null, isAuthenticated: false });
-      useCoinsStore.getState().cleanup();
+
+  const initializeAuth = async () => {
+    try {
+      // Try to restore token
+      const storedToken = await AsyncStorage.getItem('@auth_token');
+      if (storedToken) {
+        set({ token: storedToken });
+      }
+
+      // Set up auth state listener
+      unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+        try {
+          if (firebaseUser) {
+            const token = await getAuthToken();
+            if (token) {
+              await AsyncStorage.setItem('@auth_token', token);
+            }
+
+            const user: User = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || '',
+              photoURL: firebaseUser.photoURL || '',
+              phoneNumber: firebaseUser.phoneNumber || undefined,
+            };
+            
+            set({ 
+              user, 
+              isAuthenticated: true, 
+              token, 
+              isInitialized: true 
+            });
+          } else {
+            set({ 
+              user: null, 
+              isAuthenticated: false, 
+              token: null,
+              isInitialized: true 
+            });
+          }
+        } catch (error) {
+          console.error('Auth state change error:', error);
+          set({ 
+            user: null, 
+            isAuthenticated: false, 
+            token: null,
+            isInitialized: true,
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      set({ isInitialized: true });
     }
-  });
+  };
+
+  // Initialize auth state
+  initializeAuth();
 
   return {
     user: null,
     isAuthenticated: false,
     hasCompletedOnboarding: false,
+    isInitialized: false,
+    token: null,
     
     login: (user) => {
       set({ user, isAuthenticated: true });
@@ -71,13 +117,17 @@ export const useAuthStore = create<AuthState>((set) => {
     
     logout: async () => {
       try {
-        const currentUser = useAuthStore.getState().user;
+        const currentUser = get().user;
+        if (!currentUser) return;
         
-        // Clean up store subscriptions first
+        const logoutSuccess = await logOut();
+        if (!logoutSuccess) return;
+        
+        // Clean up subscriptions and state
         useCoinsStore.getState().cleanup();
         
-        // Clear AsyncStorage
         await AsyncStorage.multiRemove([
+          '@auth_token',
           'theme-store',
           'auth-state',
           'user-preferences',
@@ -85,40 +135,35 @@ export const useAuthStore = create<AuthState>((set) => {
           '@profile'
         ]);
 
-        // Handle mobile-specific logout
-        if (Platform.OS !== 'web' && !currentUser?.isGuest) {
-          try {
-            const { GoogleSignin } = require('@react-native-google-signin/google-signin');
-            const isSignedIn = await GoogleSignin.isSignedIn();
-            if (isSignedIn) {
-              await GoogleSignin.signOut();
-            }
-          } catch (err) {
-            console.error('Google Sign out error:', err);
-          }
-        }
-
-        // Handle Firebase logout for non-guest users
-        if (!currentUser?.isGuest) {
-          await logOut();
-        }
-
-        // Clean up auth listener
         if (unsubscribeAuth) {
           unsubscribeAuth();
           unsubscribeAuth = null;
         }
 
-        // Reset all state
         set({ 
           user: null, 
           isAuthenticated: false,
-          hasCompletedOnboarding: false
+          hasCompletedOnboarding: false,
+          token: null
         });
 
       } catch (error) {
         console.error('Logout error:', error);
-        throw error;
+        throw new Error('Failed to log out. Please try again.');
+      }
+    },
+    
+    refreshToken: async () => {
+      try {
+        const token = await getAuthToken();
+        if (token) {
+          await AsyncStorage.setItem('@auth_token', token);
+          set({ token });
+        }
+        return token;
+      } catch (error) {
+        console.error('Token refresh error:', error);
+        return null;
       }
     },
     

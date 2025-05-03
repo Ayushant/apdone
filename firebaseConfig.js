@@ -2,15 +2,19 @@ import { initializeApp } from 'firebase/app';
 import { Platform } from 'react-native';
 import { 
   getAuth, 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  signInWithCredential
+  signInWithCredential,
+  getIdToken,
+  setPersistence,
+  initializeAuth,
+  getReactNativePersistence
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -27,8 +31,9 @@ import {
   limit 
 } from 'firebase/firestore';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCsnf51uNNjdTIT0S0DjofvUvEXuhWZsZo",
   authDomain: "new-app22.firebaseapp.com",
@@ -40,15 +45,56 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+
+// Initialize Auth with proper persistence
+const auth = Platform.OS === 'web' 
+  ? getAuth(app)
+  : initializeAuth(app, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+    });
+
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Configure Google Sign In
 GoogleSignin.configure({
   webClientId: '745093990275-fc6bol73j7e77q0sp7kg1f7luoe0kuc6.apps.googleusercontent.com',
-  iosClientId: 'YOUR_IOS_CLIENT_ID', // Get this from your GoogleService-Info.plist if you need iOS support
+  iosClientId: 'YOUR_IOS_CLIENT_ID',  // Only needed for iOS
 });
+
+// Token management
+export const getAuthToken = async () => {
+  const user = auth.currentUser;
+  if (!user) return null;
+  try {
+    return await getIdToken(user, true); // Force refresh token
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+};
+
+// API request wrapper with token
+export const authenticatedFetch = async (url, options = {}) => {
+  const token = await getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    credentials: 'omit', // Don't send cookies
+  });
+
+  if (!response.ok) {
+    throw new Error('API request failed');
+  }
+
+  return response;
+};
 
 // Collection References
 export const usersCollection = collection(db, 'users');
@@ -68,6 +114,8 @@ export const signUp = async (email, password) => {
 export const signIn = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const token = await getIdToken(userCredential.user);
+    await AsyncStorage.setItem('@auth_token', token);
     return userCredential.user;
   } catch (error) {
     throw error;
@@ -76,11 +124,20 @@ export const signIn = async (email, password) => {
 
 export const logOut = async () => {
   try {
-    if (await GoogleSignin.isSignedIn()) {
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('Are you sure you want to log out?');
+      if (!confirmed) return false;
+    }
+    
+    if (Platform.OS !== 'web' && await GoogleSignin.isSignedIn()) {
       await GoogleSignin.signOut();
     }
+    
+    await AsyncStorage.removeItem('@auth_token');
     await signOut(auth);
+    return true;
   } catch (error) {
+    console.error('Logout error:', error);
     throw error;
   }
 };
@@ -89,14 +146,16 @@ export const logOut = async () => {
 export const signInWithGoogle = async () => {
   try {
     if (Platform.OS === 'web') {
-      // On web, use popup
       const result = await signInWithPopup(auth, googleProvider);
+      const token = await getIdToken(result.user);
+      await AsyncStorage.setItem('@auth_token', token);
       return result.user;
     } else {
-      // On mobile, use Google Sign-In from @react-native-google-signin/google-signin
       const { idToken } = await GoogleSignin.signIn();
       const googleCredential = GoogleAuthProvider.credential(idToken);
       const userCredential = await signInWithCredential(auth, googleCredential);
+      const firebaseToken = await getIdToken(userCredential.user);
+      await AsyncStorage.setItem('@auth_token', firebaseToken);
       return userCredential.user;
     }
   } catch (error) {
@@ -202,7 +261,33 @@ export const createUserProfile = async (userId, userData) => {
 };
 
 export const subscribeToUserProfile = (userId, callback) => {
-  return subscribeToDocument('users', userId, callback);
+  let unsubscribe = null;
+
+  const setupSubscription = async () => {
+    const token = await getAuthToken();
+    if (!token) return;
+
+    const userRef = doc(db, 'users', userId);
+    unsubscribe = onSnapshot(userRef, 
+      (doc) => {
+        if (doc.exists()) {
+          callback(doc.data());
+        }
+      },
+      (error) => {
+        console.error('Profile subscription error:', error);
+        if (error.code === 'permission-denied') {
+          // Attempt token refresh and resubscribe
+          getIdToken(auth.currentUser, true)
+            .then(() => setupSubscription())
+            .catch(console.error);
+        }
+      }
+    );
+  };
+
+  setupSubscription();
+  return () => unsubscribe?.();
 };
 
 export { app, auth, db };

@@ -6,13 +6,14 @@ import {
   ScrollView, 
   TouchableOpacity, 
   Image, 
-  useColorScheme 
+  useColorScheme,
+  Alert,
+  Platform 
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
-import { Platform } from "react-native";
 import { 
   User, 
   Settings, 
@@ -29,12 +30,21 @@ import { useAuthStore } from "@/store/auth-store";
 import { useCoinsStore } from "@/store/coins-store";
 import { subscribeToUserProfile } from '@/firebaseConfig';
 import { Share as ShareAPI } from 'react-native';
+import LogoutButton from "@/components/LogoutButton"; // Fixed import
 
 interface UserProfile {
   coins: number;
   achievements: string[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface MenuItem {
+  icon: React.ReactNode;
+  title: string;
+  iconBg: string;
+  color?: string; // Added color property to type
+  onPress: () => void;
 }
 
 function ProfileScreen() {
@@ -62,44 +72,6 @@ function ProfileScreen() {
     };
   }, [user?.uid]);
 
-  const handleLogout = async () => {
-    if (isLoggingOut) return;
-    
-    setIsLoggingOut(true);
-    
-    try {
-      // Haptic feedback for logout action
-      if (Platform.OS !== "web") {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-
-      // Clean up profile subscription
-      if (typeof unsubscribeProfile === 'function') {
-        unsubscribeProfile();
-        setUnsubscribeProfile(undefined);
-      }
-
-      // Clear local state
-      setUserData(null);
-
-      // Perform logout which will handle platform-specific cleanup
-      await logout();
-      
-      // Navigate to signup screen
-      router.replace("/(auth)/signup");
-      
-    } catch (error) {
-      console.error("Logout failed:", error);
-      
-      // Error haptic feedback
-      if (Platform.OS !== "web") {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
   const handleHaptic = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -120,7 +92,7 @@ function ProfileScreen() {
     }
   };
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       icon: <User size={20} color={colors.primary} />,
       title: "Edit Profile",
@@ -153,13 +125,6 @@ function ProfileScreen() {
       title: "Invite Friends",
       iconBg: "rgba(236, 72, 153, 0.1)",
       onPress: handleShare
-    },
-    {
-      icon: <LogOut size={20} color="#EF4444" />,
-      title: "Logout",
-      iconBg: "rgba(239, 68, 68, 0.1)",
-      color: "#EF4444",
-      onPress: handleLogout
     }
   ];
 
@@ -261,6 +226,21 @@ function ProfileScreen() {
               <ChevronRight size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           ))}
+
+          <View style={[styles.menuItem, { backgroundColor: colors.card }]}>
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuItemIcon, { backgroundColor: "rgba(239, 68, 68, 0.1)" }]}>
+                <LogOut size={20} color="#EF4444" />
+              </View>
+              <LogoutButton 
+                style={[
+                  styles.menuItemText, 
+                  { backgroundColor: 'transparent', paddingHorizontal: 0 }
+                ]} 
+              />
+            </View>
+            <ChevronRight size={20} color={colors.textSecondary} />
+          </View>
         </View>
 
         <View style={styles.versionInfo}>

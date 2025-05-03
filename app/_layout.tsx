@@ -8,6 +8,7 @@ import { useCoinsStore } from "@/store/coins-store";
 import { theme } from "@/constants/theme";
 import { ErrorBoundary } from "./error-boundary";
 import { subscribeToUserProfile } from '@/firebaseConfig';
+import { auth } from '@/firebaseConfig';
 
 interface UserProfileData {
   coins: number;
@@ -46,28 +47,33 @@ function RootLayoutNav() {
   }, [user?.uid, user?.isGuest]);
 
   useEffect(() => {
-    // Get the current segment to determine route group
-    const currentSegment = segments[0] || "";
-    
-    // Check if we're in a protected group that requires auth
-    const requiresAuth = !["(auth)", "(onboarding)"].includes(currentSegment);
+    const checkAuthAndNavigate = async () => {
+      // Get the current segment to determine route group
+      const currentSegment = segments[0] || "";
+      
+      // Check if we're in a protected group that requires auth
+      const requiresAuth = !["(auth)", "(onboarding)"].includes(currentSegment);
 
-    const checkAndNavigate = () => {
+      // Check if user is already logged in via Firebase
+      const currentUser = auth.currentUser;
+
       if (!hasCompletedOnboarding) {
         // Always redirect to onboarding if not completed
         if (currentSegment !== "(onboarding)") {
           router.replace("/(onboarding)");
         }
-      } else if (!isAuthenticated && requiresAuth) {
-        // Redirect to login if not authenticated, regardless of guest status
+      } else if (currentUser) {
+        // If Firebase user exists, ensure they're in the protected area
+        if (!requiresAuth) {
+          router.replace("/(tabs)");
+        }
+      } else if (requiresAuth && !isAuthenticated) {
+        // No Firebase user and trying to access protected route
         router.replace("/(auth)/login");
-      } else if (isAuthenticated && ["(auth)", "(onboarding)"].includes(currentSegment)) {
-        // Redirect to tabs if authenticated but still in auth/onboarding
-        router.replace("/(tabs)");
       }
     };
 
-    checkAndNavigate();
+    checkAuthAndNavigate();
   }, [isAuthenticated, hasCompletedOnboarding, segments]);
 
   return (
